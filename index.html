@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ArDom Privat Chat</title>
+  <title>ArDom</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -511,6 +511,9 @@
       </div>
     </div>
   </div>
+
+  <!-- NOTIFIKASI -->
+  <div id="toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-[80] max-w-[90vw] text-center bg-amber-500 text-slate-950 text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl"></div>
 
   <!-- PEMILIH REAKSI -->
   <div id="react-picker" class="hidden fixed z-[70] bg-slate-900/95 backdrop-blur border border-slate-700 rounded-full px-2 py-1 shadow-2xl items-center gap-1 animate-pop"></div>
@@ -1262,10 +1265,29 @@
       });
 
       peer.on('connection', (connection) => {
+        // Sedang tersambung dengan teman lain? Tolak penelepon baru dan beri tahu bahwa kita sibuk.
+        const busyWith = (conn && conn.open && conn.peer !== connection.peer) ? conn.peer : null;
+        if (busyWith) {
+          const sendBusy = () => {
+            try { connection.send({ type: 'busy', name: myProfileName }); } catch (e) {}
+            setTimeout(() => { try { connection.close(); } catch (e) {} }, 800);
+          };
+          if (connection.open) sendBusy(); else connection.on('open', sendBusy);
+          const who = getContactName(connection.peer);
+          appendSystemMessage(`${who} mencoba menghubungi Anda, tetapi Anda sedang tersambung dengan ${getContactName(busyWith)}.`);
+          showToast(`📞 ${who} mencoba menghubungi Anda (Anda sedang sibuk).`);
+          return;
+        }
         setupDataConnection(connection);
       });
 
       peer.on('call', (mediaCall) => {
+        // Tolak panggilan video dari orang lain saat sedang sibuk
+        if (currentCall || (conn && conn.open && mediaCall.peer !== conn.peer)) {
+          try { mediaCall.close(); } catch (e) {}
+          showToast(`📞 Panggilan video dari ${getContactName(mediaCall.peer)} ditolak otomatis (Anda sedang sibuk).`);
+          return;
+        }
         incomingMediaCall = mediaCall;
         const callerName = getContactName(mediaCall.peer);
         incomingCallerTitle.textContent = `Panggilan Video dari ${callerName}`;
@@ -1340,14 +1362,39 @@
       });
 
       conn.on('data', (data) => {
+        if (data && data.type === 'busy') { onPeerBusy(connection); return; }
         handleIncomingData(data);
       });
 
       conn.on('close', () => {
+        if (connection._busy) return;
         stopHeartbeat();
         updateConnectedUI(false);
         appendSystemMessage(`Koneksi dengan ${getContactName(lastTargetPeerId)} terputus.`);
       });
+    }
+
+    // Teman yang kita hubungi sedang tersambung dengan orang lain
+    function onPeerBusy(connection) {
+      connection._busy = true;
+      clearTimeout(connectTimeoutTimer);
+      stopHeartbeat();
+      if (conn === connection) conn = null;
+      updateConnectedUI(false);
+      const who = getContactName(connection.peer);
+      statusBadge.textContent = 'Teman Sedang Sibuk';
+      statusBadge.className = 'px-2.5 py-1 text-[11px] font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30';
+      appendSystemMessage(`${who} sedang tersambung dengan teman lain (sibuk). Coba hubungi lagi nanti.`);
+      showToast(`⏳ ${who} sedang sibuk, sedang tersambung dengan teman lain.`);
+    }
+
+    let toastTimer = null;
+    function showToast(text) {
+      const t = document.getElementById('toast');
+      t.textContent = text;
+      t.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
     }
 
     function startHeartbeat() {
