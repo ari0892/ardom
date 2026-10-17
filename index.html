@@ -3,9 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ArDom Privat Chat & Video Call</title>
+  <title>ArDom Privat Chat</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tema ArDom: latar navy gelap + aksen emas/amber (menggantikan hijau & abu-abu bawaan)
+    tailwind.config = {
+      theme: { extend: { colors: {
+        emerald: { 50:'#fffbeb',100:'#fef3c7',200:'#fde68a',300:'#fcd34d',400:'#fbbf24',500:'#fbbf24',600:'#f59e0b',700:'#d97706',800:'#b45309',900:'#78350f',950:'#451a03' },
+        slate:   { 600:'#3a4270',700:'#252c52',800:'#161c3a',900:'#0b1028',950:'#060818' }
+      } } }
+    };
+  </script>
   <!-- PeerJS CDN -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <!-- Lucide Icons -->
@@ -17,208 +26,388 @@
       height: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.4);
+      background: rgba(15, 23, 42, 0.6);
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(217, 119, 6, 0.4);
+      background: rgba(51, 65, 85, 0.8);
       border-radius: 9999px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(245, 158, 11, 0.7);
+      background: rgba(71, 85, 105, 1);
     }
-    
-    /* Background Semi-Transparan Mewah & Glow ArDom */
-    .ardom-bg {
-      background: 
-        radial-gradient(circle at 15% 15%, rgba(217, 119, 6, 0.12) 0%, transparent 45%),
-        radial-gradient(circle at 85% 85%, rgba(220, 38, 38, 0.10) 0%, transparent 50%),
-        radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.5) 0%, transparent 70%),
-        linear-gradient(145deg, #0b0f19 0%, #030712 100%);
+    .mirror {
+      transform: scaleX(-1);
     }
-
-    .glass-panel {
-      background: rgba(15, 23, 42, 0.65);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+    /* Logo ArDom */
+    .ardom-logo {
+      width: 46px; height: 46px; flex-shrink: 0; border-radius: 13px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(145deg, #1d1606, #0b1028);
+      border: 1.5px solid #f59e0b;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.38), inset 0 0 10px rgba(245, 158, 11, 0.16);
     }
-
-    .gold-gradient-text {
-      background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #b45309 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .ardom-logo b { font-size: 18px; line-height: 1; color: #fbbf24; font-weight: 800; letter-spacing: 0.5px; }
+    .ardom-logo small { font-size: 6.5px; line-height: 1; color: #f59e0b; letter-spacing: 1.6px; font-weight: 700; margin-top: 3px; }
+    #active-chat-title:empty { display: none; }
+    @keyframes popIn {
+      0% { transform: scale(0.85); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pop {
+      animation: popIn 0.18s ease-out forwards;
     }
   </style>
 </head>
-<body class="ardom-bg text-slate-100 flex flex-col h-[100dvh] overflow-hidden font-sans select-none">
-
-  <!-- MODAL PEMBUATAN ID PERMANEN (@..._ardom) -->
-  <div id="modal-setup-id" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="glass-panel border border-amber-500/30 p-6 rounded-2xl max-w-sm w-full shadow-2xl">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-600 to-yellow-800 p-[1.5px] shadow-lg shadow-amber-500/20 flex items-center justify-center shrink-0">
-          <div class="w-full h-full bg-slate-950 rounded-[10px] flex flex-col items-center justify-center">
-            <span class="text-sm font-black tracking-tighter leading-none gold-gradient-text">AD</span>
-            <span class="text-[6px] font-bold tracking-widest text-amber-300 uppercase mt-0.5">ArDom</span>
-          </div>
-        </div>
-        <div>
-          <h2 class="text-base font-bold text-white">Buat ID Permanen</h2>
-          <p class="text-xs text-slate-400">Aktif selamanya di perangkat ini</p>
-        </div>
-      </div>
-
-      <form id="form-setup-id" class="space-y-4">
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1.5">Username Pilihan Anda</label>
-          <div class="flex items-center bg-slate-950/90 border border-amber-500/40 rounded-xl overflow-hidden focus-within:border-amber-400 transition">
-            <span class="pl-3 pr-1 text-amber-400 font-mono font-bold text-sm select-none">@</span>
-            <input id="input-custom-user" type="text" required placeholder="namaanda" pattern="[a-zA-Z0-9]+" title="Hanya gunakan huruf dan angka tanpa spasi"
-              class="w-full bg-transparent py-2.5 px-1 text-sm text-slate-100 placeholder-slate-600 focus:outline-none font-mono lowercase">
-            <span class="pr-3 pl-1 text-amber-400 font-mono font-bold text-sm select-none">_ardom</span>
-          </div>
-          <p class="text-[11px] text-slate-400 mt-1.5">Contoh hasil akhir: <code class="text-amber-300">@arifin_ardom</code> (Hanya huruf & angka).</p>
-        </div>
-
-        <button type="submit" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5">
-          <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-          <span>Simpan & Kunci ID Saya</span>
-        </button>
-      </form>
-    </div>
-  </div>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-[100dvh] overflow-hidden font-sans select-none">
 
   <!-- TOP HEADER / CONNECTION BAR -->
-  <header class="glass-panel border-b border-amber-500/20 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-2xl z-20">
-    <div class="flex items-center gap-2.5">
-      <!-- LOGO ARDOM EMAS -->
-      <div class="relative flex items-center justify-center shrink-0">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-600 to-yellow-800 p-[1.5px] shadow-lg shadow-amber-500/20 flex items-center justify-center">
-          <div class="w-full h-full bg-slate-950/90 rounded-[10px] flex flex-col items-center justify-center overflow-hidden border border-amber-400/30">
-            <span class="text-[14px] font-black tracking-tighter leading-none gold-gradient-text drop-shadow-[0_2px_4px_rgba(245,158,11,0.5)]">AD</span>
-            <span class="text-[6.5px] font-bold tracking-widest text-amber-300 uppercase leading-none mt-0.5">ArDom</span>
-          </div>
-        </div>
-        <span class="absolute -inset-1 rounded-xl bg-amber-500/20 blur-sm pointer-events-none -z-10"></span>
+  <header class="bg-slate-900/90 backdrop-blur border-b border-emerald-500/20 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-lg z-20">
+    <div class="flex items-center gap-3">
+      <div class="ardom-logo" title="ArDom">
+        <b>AD</b>
+        <small>ARDOM</small>
       </div>
-
       <div>
-        <h1 class="text-sm font-bold text-slate-100 tracking-wide flex items-center gap-2">
-          <span class="gold-gradient-text font-extrabold text-[15px]">ArDom</span>
-          <span class="text-slate-200">privat chat</span>
-          <span id="status-badge" class="px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            Menyiapkan ID...
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Nama teman aktif tampil di sini saat sedang terhubung (kosong = disembunyikan) -->
+          <h1 id="active-chat-title" class="text-sm font-semibold text-emerald-300 tracking-wide"></h1>
+          <span id="status-badge" class="px-2.5 py-1 text-[11px] font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+            Menunggu Sambungan
           </span>
-        </h1>
-        <div class="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+          <span id="ping-badge" class="hidden px-1.5 py-0.5 text-[10px] font-mono rounded bg-slate-800 text-slate-400 border border-slate-700">
+            -- ms
+          </span>
+        </div>
+        <div class="flex items-center gap-1.5 text-xs text-slate-400 mt-1.5">
+          <span id="my-name-display" class="hidden">Saya</span>
           <span>ID:</span>
-          <code id="my-peer-id" class="text-amber-400 bg-slate-900/80 border border-amber-500/20 px-1.5 py-0.5 rounded text-[11px] font-mono tracking-wider select-all cursor-pointer">...</code>
-          <button id="btn-copy-id" class="text-slate-400 hover:text-amber-300 p-1 rounded hover:bg-slate-800 transition" title="Salin ID Saya">
+          <code id="my-peer-id" class="text-emerald-400 bg-slate-800 border border-emerald-500/20 px-2 py-0.5 rounded-md text-[12px] font-mono tracking-wide select-all cursor-pointer">...</code>
+          <button id="btn-copy-id" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800" title="Salin ID Saya">
             <i data-lucide="copy" class="w-3.5 h-3.5"></i>
           </button>
-          <button id="btn-change-id" class="text-slate-400 hover:text-amber-300 p-1 rounded hover:bg-slate-800 transition" title="Ubah ID Permanen">
+          <button id="btn-edit-id" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800" title="Ubah ID Saya">
             <i data-lucide="user-cog" class="w-3.5 h-3.5"></i>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- CONNECTION CONTROLS -->
-    <div class="flex items-center gap-2 flex-grow sm:flex-grow-0">
-      <div class="flex items-center gap-1 flex-1 sm:w-64">
-        <input id="target-peer-id" type="text" placeholder="Ketik @nama_ardom..." 
-          class="w-full bg-slate-950/60 backdrop-blur-md border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition">
-        <button id="btn-connect" class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 transition shadow-lg shadow-amber-500/20 shrink-0">
+    <!-- CONNECTION & CONTACTS CONTROLS -->
+    <div class="flex items-center gap-1.5 sm:gap-2 flex-grow sm:flex-grow-0 justify-end">
+      <!-- TOMBOL DAFTAR TEMAN -->
+      <button id="btn-open-contacts" class="bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 px-2.5 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+        <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-400"></i>
+        <span>Teman</span>
+        <span id="contacts-count-badge" class="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px] font-mono">0</span>
+      </button>
+
+      <div class="flex items-center gap-1.5 flex-1 sm:flex-none">
+        <input id="target-peer-id" type="text" placeholder="@id_teman" autocomplete="off" autocapitalize="off" spellcheck="false"
+          class="w-full sm:w-44 bg-slate-950/80 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+        <button id="btn-connect" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-500/20">
           <i data-lucide="link" class="w-3.5 h-3.5"></i>
-          <span>Hubungkan</span>
+          <span class="hidden sm:inline">Hubungkan</span>
         </button>
       </div>
 
       <!-- VIDEO CALL BUTTON -->
-      <button id="btn-start-call" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition shadow shrink-0">
+      <button id="btn-start-call" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
         <i data-lucide="video" class="w-3.5 h-3.5"></i>
-        <span class="hidden sm:inline">Panggilan Video</span>
+        <span class="hidden md:inline">Panggilan Video</span>
       </button>
     </div>
   </header>
 
-  <!-- MAIN CHAT CONTAINER (SEMI TRANSPARAN) -->
-  <main class="flex-1 flex flex-col min-h-0 relative bg-slate-950/40 backdrop-blur-md">
+  <!-- QUICK SAVED FRIENDS BAR (1-KLIK LANGSUNG CHAT) -->
+  <div id="quick-contacts-bar" class="hidden bg-slate-900/60 border-b border-slate-800/80 px-3 py-1.5 flex items-center gap-2 overflow-x-auto text-xs z-10">
+    <span class="text-[11px] text-slate-400 shrink-0 flex items-center gap-1">
+      <i data-lucide="users" class="w-3 h-3 text-amber-400"></i> Riwayat Teman:
+    </span>
+    <div id="quick-contacts-list" class="flex items-center gap-1.5">
+      <!-- Diisi otomatis dari daftar teman -->
+    </div>
+  </div>
+
+  <!-- MAIN CHAT CONTAINER -->
+  <main class="flex-1 flex flex-col min-h-0 relative bg-slate-950">
+    <!-- Messages Scroll Area -->
     <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
       <div class="flex justify-center">
-        <div class="glass-panel border border-amber-500/20 rounded-2xl px-4 py-2.5 text-center text-xs text-slate-400 max-w-md shadow-xl">
-          <p class="font-bold text-amber-300 mb-1 flex items-center justify-center gap-1.5">
-            <i data-lucide="shield-check" class="w-4 h-4 text-amber-400"></i>
-            Enkripsi P2P ArDom Langsung Antar Perangkat
-          </p>
-          <p class="text-[11px] text-slate-300">Gunakan ID permanen <code class="text-amber-300">@nama_ardom</code> untuk terhubung kapan saja tanpa perlu meminta ID acak baru.</p>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-center text-xs text-slate-400 max-w-md">
+          <p class="font-medium text-emerald-300 mb-1">🛡️ Enkripsi P2P ArDom Langsung Antar Perangkat</p>
+          <p>Gunakan ID permanen <span class="font-mono text-emerald-400">@nama_ardom</span> untuk terhubung kapan saja tanpa perlu meminta ID acak baru. Teman yang pernah chat otomatis tersimpan di menu <b>Teman</b>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMOJI & CUSTOM EMOTE PICKER POPOVER -->
+    <div id="emote-popover" class="hidden absolute bottom-16 left-2 sm:left-4 z-30 w-80 sm:w-96 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-pop">
+      <div class="flex items-center justify-between bg-slate-950/70 border-b border-slate-800 px-2 py-1.5">
+        <div class="flex gap-1">
+          <button id="tab-btn-emoji" class="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-slate-950 transition">
+            😀 Emoji
+          </button>
+          <button id="tab-btn-custom" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition">
+            ✨ Emot Kustom
+          </button>
+        </div>
+        <button id="btn-open-creator" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 transition shadow">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          <span>Buat Emot</span>
+        </button>
+      </div>
+
+      <div id="panel-emoji" class="p-3 max-h-60 overflow-y-auto grid grid-cols-7 gap-1.5 text-xl text-center"></div>
+
+      <div id="panel-custom" class="hidden p-3 max-h-60 overflow-y-auto">
+        <div id="custom-emote-grid" class="grid grid-cols-4 gap-2"></div>
+        <div id="custom-emote-empty" class="text-center py-8 text-xs text-slate-500">
+          <p class="mb-2">Belum ada emot kustom.</p>
+          <button id="btn-empty-create" class="text-indigo-400 hover:underline font-medium">+ Klik untuk membuat emot pertama Anda</button>
         </div>
       </div>
     </div>
 
     <!-- Active File Transfer Progress -->
-    <div id="transfer-tray" class="hidden glass-panel border-t border-amber-500/20 px-4 py-2 text-xs flex items-center justify-between gap-4">
+    <div id="transfer-tray" class="hidden bg-slate-900/90 border-t border-slate-800 px-4 py-2 text-xs flex items-center justify-between gap-4">
       <div class="flex items-center gap-2 truncate">
-        <i data-lucide="arrow-up-right" class="w-4 h-4 text-amber-400 shrink-0"></i>
+        <i data-lucide="arrow-up-right" class="w-4 h-4 text-emerald-400 shrink-0"></i>
         <span id="transfer-filename" class="truncate font-mono text-slate-300">file.zip</span>
       </div>
       <div class="flex items-center gap-3 w-48 shrink-0">
-        <div class="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden border border-slate-700">
-          <div id="transfer-progress-bar" class="bg-gradient-to-r from-amber-500 to-amber-300 h-full w-0 transition-all duration-150"></div>
+        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+          <div id="transfer-progress-bar" class="bg-emerald-500 h-full w-0 transition-all duration-150"></div>
         </div>
-        <span id="transfer-percent" class="text-[11px] font-mono text-amber-400 w-9 text-right font-bold">0%</span>
+        <span id="transfer-percent" class="text-[11px] font-mono text-slate-400 w-9 text-right">0%</span>
       </div>
     </div>
 
     <!-- Bottom Chat Input Bar -->
-    <div class="glass-panel border-t border-white/10 p-2.5 sm:p-3 flex items-center gap-2">
+    <div class="bg-slate-900/90 border-t border-slate-800 p-2.5 sm:p-3 flex items-center gap-1.5 sm:gap-2">
       <input type="file" id="file-input" class="hidden">
-      <button id="btn-attach-file" disabled class="p-2 text-slate-400 hover:text-amber-300 hover:bg-slate-800/80 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition" title="Lampirkan File">
+      <button id="btn-attach-file" disabled class="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition" title="Lampirkan File">
         <i data-lucide="paperclip" class="w-5 h-5"></i>
       </button>
 
-      <input id="message-input" type="text" placeholder="Ketik pesan..." disabled
-        class="flex-1 bg-slate-950/60 backdrop-blur-md border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 disabled:opacity-50 transition">
+      <!-- EMOJI / EMOTE BUTTON -->
+      <button id="btn-toggle-emote" disabled class="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition" title="Emoji & Emot Kustom">
+        <i data-lucide="smile-plus" class="w-5 h-5"></i>
+      </button>
 
-      <button id="btn-send-message" disabled class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 p-2 sm:px-4 sm:py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 transition shadow-lg shadow-amber-500/20">
+      <input id="message-input" type="text" placeholder="Ketik pesan..." disabled
+        class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 disabled:opacity-50">
+
+      <button id="btn-send-message" disabled class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 p-2 sm:px-4 sm:py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 transition shadow">
         <i data-lucide="send" class="w-4 h-4"></i>
         <span class="hidden sm:inline">Kirim</span>
       </button>
     </div>
   </main>
 
-  <!-- VIDEO CALL OVERLAY -->
-  <div id="video-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xl flex flex-col justify-between p-4 sm:p-6 animate-fade-in">
-    <div class="flex items-center justify-between z-10">
-      <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></span>
-        <span class="text-sm font-semibold text-slate-200">ArDom Video Call Terenkripsi P2P</span>
+  <!-- ========================================== -->
+  <!-- MODAL ATUR ID PERMANEN                     -->
+  <!-- ========================================== -->
+  <div id="id-modal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-sm w-full p-5 shadow-2xl animate-pop space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="ardom-logo"><b>AD</b><small>ARDOM</small></div>
+        <div>
+          <h3 id="id-modal-title" class="text-sm font-semibold text-emerald-300">Buat ID Permanen Anda</h3>
+          <p class="text-[11px] text-slate-400">Cukup dibuat sekali, tidak berubah-ubah.</p>
+        </div>
       </div>
-      <div id="call-timer" class="text-xs font-mono text-amber-300 bg-slate-900/90 px-2.5 py-1 rounded-full border border-amber-500/30">
-        00:00
+      <div>
+        <label class="text-xs text-slate-400 font-medium block mb-1.5">ID Anda</label>
+        <div class="flex items-center bg-slate-950 border border-slate-700 focus-within:border-emerald-500 rounded-lg">
+          <span class="pl-3 text-emerald-400 font-mono text-sm">@</span>
+          <input id="id-modal-input" type="text" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="contoh: meong_ardom"
+            class="select-text flex-1 bg-transparent px-1.5 py-2 text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none">
+        </div>
+        <p id="id-modal-error" class="text-[11px] text-rose-400 mt-1.5 min-h-[1rem]"></p>
+        <p class="text-[11px] text-slate-500 mt-1">Huruf kecil, angka, dan garis bawah (_), 3–20 karakter. Teman cukup mengetik ID ini untuk terhubung dengan Anda.</p>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button id="id-modal-cancel" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-lg text-xs font-medium transition">Batal</button>
+        <button id="id-modal-save" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 px-4 py-2 rounded-lg text-xs font-semibold transition">Simpan & Mulai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL DAFTAR TEMAN & PROFIL SAYA           -->
+  <!-- ========================================== -->
+  <div id="contacts-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl flex flex-col gap-4 animate-pop max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="users" class="w-5 h-5 text-emerald-400"></i>
+          <h3 class="text-sm font-semibold text-slate-100">Daftar Teman & Profil P2P</h3>
+        </div>
+        <button id="btn-close-contacts" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Bagian Profil Saya (Nama & ID Tetap) -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2.5 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400 font-medium">Profil Saya (Otomatis tampil di teman):</span>
+          <button id="btn-reset-my-id" class="text-[11px] text-emerald-400 hover:underline flex items-center gap-1" title="Ubah ID permanen Anda">
+            <i data-lucide="user-cog" class="w-3 h-3"></i> Ubah ID
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="my-name-input" type="text" maxlength="24" placeholder="Nama tampilan Anda..." 
+            class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+          <button id="btn-save-my-name" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 px-3 py-1.5 rounded-lg font-medium transition">
+            Simpan Nama
+          </button>
+        </div>
+      </div>
+
+      <!-- Tambah Teman Manual -->
+      <div class="space-y-1.5 text-xs">
+        <label class="text-slate-400 font-medium block">Tambah / Simpan Kontak Baru:</label>
+        <div class="grid grid-cols-5 gap-1.5">
+          <input id="add-contact-name" type="text" placeholder="Nama Teman" 
+            class="col-span-2 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+          <input id="add-contact-id" type="text" placeholder="@id_teman" 
+            class="col-span-2 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500">
+          <button id="btn-add-contact" class="col-span-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold flex items-center justify-center transition">
+            + Simpan
+          </button>
+        </div>
+      </div>
+
+      <!-- Daftar Teman yang Pernah Chat -->
+      <div class="flex-1 min-h-0 flex flex-col">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+          <span>Riwayat Teman Chat (Klik untuk terhubung):</span>
+        </div>
+        <div id="contacts-list-container" class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-60">
+          <!-- Diisi oleh JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM EMOTE CREATOR MODAL -->
+  <div id="emote-creator-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl flex flex-col gap-4 animate-pop">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-5 h-5 text-indigo-400"></i>
+          <h3 class="text-sm font-semibold text-slate-100">Studio Pembuat Emot Kustom</h3>
+        </div>
+        <button id="btn-close-creator" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="flex flex-col items-center gap-2">
+        <div class="relative w-40 h-40 rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden shadow-inner"
+             style="background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 10px 10px;">
+          <canvas id="emote-canvas" width="160" height="160" class="w-40 h-40 cursor-crosshair touch-none"></canvas>
+        </div>
+        <span class="text-[11px] text-slate-400">Sentuh/geser di kanvas untuk menggambar coretan bebas</span>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="flex items-center gap-2">
+          <input type="file" id="emote-img-input" accept="image/*" class="hidden">
+          <button id="btn-upload-emote-img" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 px-3 rounded-xl font-medium border border-slate-700 flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="image-plus" class="w-4 h-4 text-emerald-400"></i>
+            <span>Pilih Foto/Gambar</span>
+          </button>
+          <button id="btn-clear-canvas" class="bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 text-slate-300 py-2 px-3 rounded-xl font-medium border border-slate-700 flex items-center gap-1 transition">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+            <span>Reset</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <input id="emote-text-input" type="text" maxlength="16" placeholder="Teks Emot (mis: MANTAP)" 
+            class="col-span-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          <select id="emote-shape-select" class="bg-slate-950 border border-slate-700 rounded-xl px-2 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="rounded">Bentuk Kotak</option>
+            <option value="circle">Bentuk Bulat</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+          <div class="flex items-center gap-2">
+            <label class="text-slate-400">Warna Kuas/Teks:</label>
+            <input id="emote-color-picker" type="color" value="#10b981" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-slate-400">Ukuran Kuas:</label>
+            <input id="emote-brush-size" type="range" min="2" max="16" value="5" class="w-20 accent-indigo-500">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <button id="btn-cancel-emote" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800 transition">
+          Batal
+        </button>
+        <button id="btn-save-emote" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg transition">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Simpan ke Koleksi</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIDEO CALL OVERLAY -->
+  <div id="video-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 z-10">
+      <div class="flex items-center gap-2.5">
+        <span id="call-health-dot" class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+        <div>
+          <span id="call-partner-name" class="text-sm font-semibold text-slate-200 block leading-tight">Video Call P2P HD</span>
+          <span id="call-network-status" class="text-[11px] text-emerald-400 font-mono">Sinyal Stabil (HD Aktif)</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <select id="video-quality-select" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:border-indigo-500">
+          <option value="hd">Kualitas: Tinggi (HD 720p)</option>
+          <option value="balanced">Kualitas: Seimbang (Stabil)</option>
+          <option value="low">Kualitas: Hemat Sinyal</option>
+        </select>
+
+        <button id="btn-refresh-ice" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1 transition" title="Segarkan Jalur Sinyal tanpa mematikan telepon">
+          <i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span class="hidden sm:inline">Stabilkan</span>
+        </button>
+
+        <div id="call-timer" class="text-xs font-mono text-slate-300 bg-slate-900/90 px-3 py-1 rounded-full border border-slate-800">
+          00:00
+        </div>
       </div>
     </div>
 
-    <div class="relative flex-1 my-4 rounded-2xl overflow-hidden bg-slate-900/80 border border-slate-800 flex items-center justify-center">
+    <div class="relative flex-1 my-3 rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center shadow-2xl">
       <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
-      <div id="remote-placeholder" class="hidden flex flex-col items-center justify-center text-slate-500">
-        <i data-lucide="user" class="w-16 h-16 stroke-[1.5]"></i>
-        <span class="text-xs mt-2">Kamera teman dimatikan</span>
+      
+      <div id="video-reconnecting-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-amber-500/90 text-slate-950 font-semibold text-xs px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 z-20">
+        <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+        <span>Menstabilkan ulang jalur sinyal video...</span>
       </div>
 
-      <div class="absolute bottom-4 right-4 w-28 sm:w-44 aspect-[3/4] sm:aspect-video rounded-xl overflow-hidden border-2 border-amber-500/70 shadow-2xl bg-black">
+      <div class="absolute bottom-4 right-4 w-28 sm:w-44 aspect-[3/4] sm:aspect-video rounded-xl overflow-hidden border-2 border-emerald-500/70 shadow-2xl bg-black z-10">
         <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover mirror"></video>
       </div>
     </div>
 
-    <div class="flex items-center justify-center gap-3 sm:gap-4 z-10 pb-2">
-      <button id="btn-toggle-mic" class="w-12 h-12 rounded-full bg-slate-800/90 hover:bg-slate-700 text-white flex items-center justify-center transition shadow-lg border border-slate-700">
+    <div class="flex items-center justify-center gap-3 sm:gap-4 z-10 pb-1">
+      <button id="btn-toggle-mic" class="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition shadow-lg border border-slate-700">
         <i data-lucide="mic" class="w-5 h-5"></i>
       </button>
-      <button id="btn-toggle-cam" class="w-12 h-12 rounded-full bg-slate-800/90 hover:bg-slate-700 text-white flex items-center justify-center transition shadow-lg border border-slate-700">
+      <button id="btn-toggle-cam" class="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition shadow-lg border border-slate-700">
         <i data-lucide="video" class="w-5 h-5"></i>
       </button>
-      <button id="btn-switch-cam" class="w-12 h-12 rounded-full bg-slate-800/90 hover:bg-slate-700 text-white flex items-center justify-center transition shadow-lg border border-slate-700" title="Balik Kamera">
+      <button id="btn-switch-cam" class="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition shadow-lg border border-slate-700" title="Balik Kamera">
         <i data-lucide="refresh-cw" class="w-5 h-5"></i>
       </button>
       <button id="btn-hangup" class="w-12 h-12 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center transition shadow-lg">
@@ -228,18 +417,18 @@
   </div>
 
   <!-- INCOMING CALL MODAL -->
-  <div id="incoming-call-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="glass-panel border border-amber-500/30 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl flex flex-col items-center">
-      <div class="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4 ring-8 ring-amber-500/10 animate-bounce">
+  <div id="incoming-call-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl flex flex-col items-center">
+      <div class="w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 ring-8 ring-indigo-500/10 animate-bounce">
         <i data-lucide="phone-call" class="w-8 h-8"></i>
       </div>
-      <h3 class="text-base font-bold text-slate-100">Panggilan Video Masuk</h3>
-      <p class="text-xs text-slate-400 mt-1 mb-6">Teman Anda mengajak melakukan video call di <span class="text-amber-400 font-semibold">ArDom</span>.</p>
+      <h3 id="incoming-caller-title" class="text-base font-semibold text-slate-100">Panggilan Video HD Masuk</h3>
+      <p class="text-xs text-slate-400 mt-1 mb-6">Teman Anda mengajak melakukan panggilan video P2P.</p>
       <div class="flex items-center gap-3 w-full">
         <button id="btn-decline-call" class="flex-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 py-2.5 rounded-xl text-xs font-semibold transition">
           Tolak
         </button>
-        <button id="btn-accept-call" class="flex-1 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center justify-center gap-1.5">
+        <button id="btn-accept-call" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 py-2.5 rounded-xl text-xs font-semibold transition shadow-lg flex items-center justify-center gap-1.5">
           <i data-lucide="phone" class="w-4 h-4"></i>
           <span>Terima</span>
         </button>
@@ -252,16 +441,14 @@
     lucide.createIcons();
 
     // DOM References
-    const modalSetupId = document.getElementById('modal-setup-id');
-    const formSetupId = document.getElementById('form-setup-id');
-    const inputCustomUser = document.getElementById('input-custom-user');
-    const btnChangeId = document.getElementById('btn-change-id');
-
     const myPeerIdEl = document.getElementById('my-peer-id');
+    const myNameDisplay = document.getElementById('my-name-display');
+    const activeChatTitle = document.getElementById('active-chat-title');
     const btnCopyId = document.getElementById('btn-copy-id');
     const targetPeerIdInput = document.getElementById('target-peer-id');
     const btnConnect = document.getElementById('btn-connect');
     const statusBadge = document.getElementById('status-badge');
+    const pingBadge = document.getElementById('ping-badge');
     const btnStartCall = document.getElementById('btn-start-call');
     const chatMessages = document.getElementById('chat-messages');
     const messageInput = document.getElementById('message-input');
@@ -269,6 +456,48 @@
     const btnAttachFile = document.getElementById('btn-attach-file');
     const fileInput = document.getElementById('file-input');
 
+    // Contacts DOM
+    const btnOpenContacts = document.getElementById('btn-open-contacts');
+    const btnCloseContacts = document.getElementById('btn-close-contacts');
+    const contactsModal = document.getElementById('contacts-modal');
+    const contactsCountBadge = document.getElementById('contacts-count-badge');
+    const contactsListContainer = document.getElementById('contacts-list-container');
+    const quickContactsBar = document.getElementById('quick-contacts-bar');
+    const quickContactsList = document.getElementById('quick-contacts-list');
+    const myNameInput = document.getElementById('my-name-input');
+    const btnSaveMyName = document.getElementById('btn-save-my-name');
+    const btnResetMyId = document.getElementById('btn-reset-my-id');
+    const addContactName = document.getElementById('add-contact-name');
+    const addContactId = document.getElementById('add-contact-id');
+    const btnAddContact = document.getElementById('btn-add-contact');
+
+    // Emote & Creator DOM
+    const btnToggleEmote = document.getElementById('btn-toggle-emote');
+    const emotePopover = document.getElementById('emote-popover');
+    const tabBtnEmoji = document.getElementById('tab-btn-emoji');
+    const tabBtnCustom = document.getElementById('tab-btn-custom');
+    const panelEmoji = document.getElementById('panel-emoji');
+    const panelCustom = document.getElementById('panel-custom');
+    const customEmoteGrid = document.getElementById('custom-emote-grid');
+    const customEmoteEmpty = document.getElementById('custom-emote-empty');
+    const btnOpenCreator = document.getElementById('btn-open-creator');
+    const btnEmptyCreate = document.getElementById('btn-empty-create');
+
+    const emoteCreatorModal = document.getElementById('emote-creator-modal');
+    const btnCloseCreator = document.getElementById('btn-close-creator');
+    const btnCancelEmote = document.getElementById('btn-cancel-emote');
+    const btnSaveEmote = document.getElementById('btn-save-emote');
+    const emoteCanvas = document.getElementById('emote-canvas');
+    const ctx = emoteCanvas.getContext('2d');
+    const emoteImgInput = document.getElementById('emote-img-input');
+    const btnUploadEmoteImg = document.getElementById('btn-upload-emote-img');
+    const btnClearCanvas = document.getElementById('btn-clear-canvas');
+    const emoteTextInput = document.getElementById('emote-text-input');
+    const emoteShapeSelect = document.getElementById('emote-shape-select');
+    const emoteColorPicker = document.getElementById('emote-color-picker');
+    const emoteBrushSize = document.getElementById('emote-brush-size');
+
+    // File Transfer DOM
     const transferTray = document.getElementById('transfer-tray');
     const transferFilename = document.getElementById('transfer-filename');
     const transferProgressBar = document.getElementById('transfer-progress-bar');
@@ -283,109 +512,660 @@
     const btnSwitchCam = document.getElementById('btn-switch-cam');
     const btnHangup = document.getElementById('btn-hangup');
     const incomingModal = document.getElementById('incoming-call-modal');
+    const incomingCallerTitle = document.getElementById('incoming-caller-title');
     const btnAcceptCall = document.getElementById('btn-accept-call');
     const btnDeclineCall = document.getElementById('btn-decline-call');
     const callTimerEl = document.getElementById('call-timer');
+    const callHealthDot = document.getElementById('call-health-dot');
+    const callPartnerName = document.getElementById('call-partner-name');
+    const callNetworkStatus = document.getElementById('call-network-status');
+    const videoQualitySelect = document.getElementById('video-quality-select');
+    const btnRefreshIce = document.getElementById('btn-refresh-ice');
+    const videoReconnectingBanner = document.getElementById('video-reconnecting-banner');
 
     // State Variables
     let peer = null;
     let conn = null;
+    let lastTargetPeerId = '';
     let currentCall = null;
     let localStream = null;
     let incomingMediaCall = null;
     let currentFacingMode = 'user';
     let ringtoneInterval = null;
     let callTimerInterval = null;
+    let heartbeatInterval = null;
     let callSeconds = 0;
 
+    // File transfer state
     const CHUNK_SIZE = 16 * 1024;
     let receivingFiles = {};
 
-    // ====================================================
-    // KONVERSI FORMAT @nama_ardom <-> PEERJS INTERNAL ID
-    // ====================================================
-    const INTERNAL_PREFIX = 'ardom-user-';
+    // ==========================================
+    // 0. SISTEM DAFTAR TEMAN & ID PERMANEN
+    // ==========================================
+    let myProfileName = localStorage.getItem('p2p_my_profile_name') || 'User-' + Math.floor(100 + Math.random() * 900);
+    localStorage.setItem('p2p_my_profile_name', myProfileName);
+    myNameDisplay.textContent = myProfileName;
+    myNameInput.value = myProfileName;
 
-    // Mengubah nama pendek "arifin" menjadi tampilan "@arifin_ardom"
-    function toDisplayId(rawName) {
-      return `@${rawName}_ardom`;
+    // Struktur Kontak: [{ id: 'room-xxx', name: 'Nama Teman', lastSeen: 1700000000 }]
+    let savedContacts = JSON.parse(localStorage.getItem('p2p_saved_contacts') || '[]');
+    // Struktur Riwayat Chat Singkat per Peer ID: { 'room-xxx': [{ sender, type, content, time }] }
+    let chatHistoryMap = JSON.parse(localStorage.getItem('p2p_chat_history_map') || '{}');
+
+    // ==========================================
+    // ID PERMANEN BUATAN SENDIRI (contoh: @meong_ardom)
+    // PeerJS tidak menerima "@", jadi ID asli = "ardom-" + nama; tampilan memakai "@nama".
+    // ==========================================
+    const ID_PREFIX = 'ardom-';
+
+    function sanitizeTyping(v) {
+      return (v || '').toLowerCase().replace(/^@+/, '').replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    }
+    function normalizeHandle(v) {
+      return sanitizeTyping(v).replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    }
+    function validateHandle(h) {
+      if (h.length < 3) return 'Minimal 3 karakter.';
+      if (h.length > 20) return 'Maksimal 20 karakter.';
+      if (!/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(h)) return 'Hanya huruf kecil, angka, dan _ (tanpa _ di awal/akhir).';
+      return '';
+    }
+    // Input teman ("@nama", "nama", atau ID lama "room-xxxx") -> ID PeerJS
+    function toPeerId(input) {
+      const raw = (input || '').trim();
+      if (!raw) return '';
+      if (/^room-[a-z0-9]+$/i.test(raw)) return raw;
+      if (raw.toLowerCase().startsWith(ID_PREFIX)) return raw.toLowerCase();
+      const h = normalizeHandle(raw);
+      return h ? ID_PREFIX + h : '';
+    }
+    // ID PeerJS -> tampilan "@nama"
+    function displayId(peerId) {
+      return peerId && peerId.startsWith(ID_PREFIX) ? '@' + peerId.slice(ID_PREFIX.length) : (peerId || '');
     }
 
-    // Mengubah nama pendek "arifin" menjadi ID server PeerJS "ardom-user-arifin_ardom"
-    function toInternalPeerId(rawName) {
-      return `${INTERNAL_PREFIX}${rawName}_ardom`;
+    function getOrCreatePersistentPeerId() {
+      const handle = localStorage.getItem('p2p_my_handle');
+      return handle ? ID_PREFIX + handle : null;
     }
 
-    // Mengubah ID server PeerJS kembali menjadi tampilan "@nama_ardom"
-    function internalToDisplayId(internalId) {
-      if (internalId && internalId.startsWith(INTERNAL_PREFIX)) {
-        return '@' + internalId.replace(INTERNAL_PREFIX, '');
-      }
-      return internalId;
+    const idModal = document.getElementById('id-modal');
+    const idModalInput = document.getElementById('id-modal-input');
+    const idModalError = document.getElementById('id-modal-error');
+    const idModalTitle = document.getElementById('id-modal-title');
+    const idModalSave = document.getElementById('id-modal-save');
+    const idModalCancel = document.getElementById('id-modal-cancel');
+    const btnEditId = document.getElementById('btn-edit-id');
+    let idModalRequired = false;
+    let idRetryCount = 0;
+
+    function openIdModal(required, message) {
+      idModalRequired = !!required;
+      idModalCancel.classList.toggle('hidden', idModalRequired);
+      idModalTitle.textContent = localStorage.getItem('p2p_my_handle') ? 'Ubah ID Permanen Anda' : 'Buat ID Permanen Anda';
+      idModalInput.value = localStorage.getItem('p2p_my_handle') || '';
+      idModalError.textContent = message || '';
+      contactsModal.classList.add('hidden');
+      idModal.classList.remove('hidden');
+      setTimeout(() => idModalInput.focus(), 60);
+    }
+    function closeIdModal() { idModal.classList.add('hidden'); }
+
+    function saveIdFromModal() {
+      const h = normalizeHandle(idModalInput.value);
+      const err = validateHandle(h);
+      if (err) { idModalError.textContent = err; return; }
+      const old = localStorage.getItem('p2p_my_handle');
+      if (old === h && peer && !peer.destroyed && peer.open) { closeIdModal(); return; }
+      localStorage.setItem('p2p_my_handle', h);
+      closeIdModal();
+      idRetryCount = 0;
+      if (conn) { try { conn.close(); } catch (e) {} }
+      if (peer) { try { peer.destroy(); } catch (e) {} }
+      initPeer();
     }
 
-    // Mengubah input ketikan user (bisa "@budi_ardom", "budi_ardom", atau "budi") ke ID server PeerJS
-    function parseInputToInternalId(userInput) {
-      let clean = userInput.trim().toLowerCase();
-      if (clean.startsWith('@')) clean = clean.substring(1);
-      if (clean.endsWith('_ardom')) clean = clean.slice(0, -6);
-      clean = clean.replace(/[^a-z0-9]/g, '');
-      if (!clean) return null;
-      return toInternalPeerId(clean);
+    idModalInput.addEventListener('input', () => {
+      idModalInput.value = sanitizeTyping(idModalInput.value);
+      idModalError.textContent = '';
+    });
+    idModalInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveIdFromModal();
+      if (e.key === 'Escape' && !idModalRequired) closeIdModal();
+    });
+    idModalSave.addEventListener('click', saveIdFromModal);
+    idModalCancel.addEventListener('click', closeIdModal);
+    btnEditId.addEventListener('click', () => openIdModal(false));
+
+    function getContactName(peerId) {
+      const found = savedContacts.find(c => c.id === peerId);
+      return found ? found.name : displayId(peerId);
     }
 
-    // Cek apakah user sudah punya ID permanen di localStorage
-    let savedShortName = localStorage.getItem('ardom_permanent_user') || '';
-    let lastTargetId = localStorage.getItem('ardom_last_target') || '';
-    if (lastTargetId) targetPeerIdInput.value = lastTargetId;
+    function saveOrUpdateContact(peerId, suggestedName = '', updateCustomName = false) {
+      if (!peerId || (peer && peerId === peer.id)) return;
+      const existingIdx = savedContacts.findIndex(c => c.id === peerId);
+      const now = Date.now();
 
-    function checkAndInitId() {
-      if (!savedShortName) {
-        modalSetupId.classList.remove('hidden');
-        inputCustomUser.focus();
+      if (existingIdx > -1) {
+        savedContacts[existingIdx].lastSeen = now;
+        if (suggestedName && (updateCustomName || savedContacts[existingIdx].name === peerId || savedContacts[existingIdx].name.startsWith('Teman-'))) {
+          savedContacts[existingIdx].name = suggestedName;
+        }
       } else {
-        modalSetupId.classList.add('hidden');
-        initPeer(savedShortName);
+        savedContacts.unshift({
+          id: peerId,
+          name: suggestedName || ('Teman-' + displayId(peerId).replace(/^@|^room-/, '')),
+          lastSeen: now
+        });
+      }
+
+      // Urutkan berdasarkan waktu chat terakhir
+      savedContacts.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+      localStorage.setItem('p2p_saved_contacts', JSON.stringify(savedContacts));
+      renderContactsUI();
+    }
+
+    function deleteContact(peerId) {
+      savedContacts = savedContacts.filter(c => c.id !== peerId);
+      localStorage.setItem('p2p_saved_contacts', JSON.stringify(savedContacts));
+      renderContactsUI();
+    }
+
+    function saveChatHistoryItem(peerId, item) {
+      if (!peerId) return;
+      if (!chatHistoryMap[peerId]) chatHistoryMap[peerId] = [];
+      chatHistoryMap[peerId].push(item);
+      // Simpan maksimal 25 pesan terakhir per teman agar localStorage tetap ringan
+      if (chatHistoryMap[peerId].length > 25) {
+        chatHistoryMap[peerId] = chatHistoryMap[peerId].slice(-25);
+      }
+      try {
+        localStorage.setItem('p2p_chat_history_map', JSON.stringify(chatHistoryMap));
+      } catch (e) {
+        // Jika kuota localStorage penuh karena gambar emot, hapus riwayat paling lama
+        chatHistoryMap[peerId] = chatHistoryMap[peerId].slice(-10);
       }
     }
 
-    formSetupId.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const raw = inputCustomUser.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (!raw) {
-        alert('Gunakan huruf atau angka saja!');
+    function loadChatHistoryForPeer(peerId) {
+      chatMessages.innerHTML = '';
+      const history = chatHistoryMap[peerId] || [];
+      if (history.length === 0) {
+        appendSystemMessage(`Mulai percakapan P2P terenkripsi dengan ${getContactName(peerId)} (${displayId(peerId)})`);
         return;
       }
-      savedShortName = raw;
-      localStorage.setItem('ardom_permanent_user', savedShortName);
-      modalSetupId.classList.add('hidden');
-      initPeer(savedShortName);
-    });
+      appendSystemMessage(`Memuat riwayat obrolan dengan ${getContactName(peerId)}`);
+      history.forEach(msg => {
+        if (msg.type === 'text') {
+          appendChatMessage(msg.content, msg.sender, msg.time, false);
+        } else if (msg.type === 'emote') {
+          appendEmoteBubble(msg.content, msg.sender, msg.time, false);
+        }
+      });
+    }
 
-    btnChangeId.addEventListener('click', () => {
-      inputCustomUser.value = savedShortName;
-      modalSetupId.classList.remove('hidden');
-      inputCustomUser.focus();
-    });
+    function renderContactsUI() {
+      contactsCountBadge.textContent = savedContacts.length;
 
-    // Init PeerJS dengan ID Permanen
-    function initPeer(shortName) {
-      if (peer) {
-        try { peer.destroy(); } catch (e) {}
+      // 1. Render Quick Bar di atas ruang chat
+      if (savedContacts.length > 0) {
+        quickContactsBar.classList.remove('hidden');
+        quickContactsList.innerHTML = '';
+        savedContacts.forEach(contact => {
+          const isCurrent = conn && conn.open && conn.peer === contact.id;
+          const chip = document.createElement('button');
+          chip.className = `px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 shrink-0 transition border ${
+            isCurrent
+              ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
+              : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border-slate-700'
+          }`;
+          chip.innerHTML = `
+            <span class="w-2 h-2 rounded-full ${isCurrent ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}"></span>
+            <span>${escapeHtml(contact.name)}</span>
+          `;
+          chip.addEventListener('click', () => connectToFriend(contact.id));
+          quickContactsList.appendChild(chip);
+        });
+      } else {
+        quickContactsBar.classList.add('hidden');
       }
 
-      const displayId = toDisplayId(shortName);
-      const internalId = toInternalPeerId(shortName);
+      // 2. Render Daftar di dalam Modal Kontak
+      contactsListContainer.innerHTML = '';
+      if (savedContacts.length === 0) {
+        contactsListContainer.innerHTML = `
+          <div class="text-center py-8 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
+            Belum ada riwayat teman. Hubungkan ke ID teman sekali saja, maka ID mereka akan tersimpan otomatis di sini.
+          </div>
+        `;
+        return;
+      }
 
-      myPeerIdEl.textContent = displayId;
-      statusBadge.textContent = 'Menghubungkan Server...';
+      savedContacts.forEach(contact => {
+        const isCurrent = conn && conn.open && conn.peer === contact.id;
+        const row = document.createElement('div');
+        row.className = 'bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-2.5 flex items-center justify-between gap-2 transition';
 
-      peer = new Peer(internalId, { debug: 1 });
+        const lastTimeStr = contact.lastSeen
+          ? new Date(contact.lastSeen).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+          : '';
 
-      peer.on('open', () => {
-        myPeerIdEl.textContent = displayId;
+        row.innerHTML = `
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5">
+              <span class="font-semibold text-xs text-slate-100 truncate">${escapeHtml(contact.name)}</span>
+              ${isCurrent ? '<span class="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 text-[10px] rounded-full">Aktif</span>' : ''}
+            </div>
+            <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono mt-0.5">
+              <span>${escapeHtml(displayId(contact.id))}</span>
+              ${lastTimeStr ? `<span class="text-slate-600">• ${lastTimeStr}</span>` : ''}
+            </div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button data-act="chat" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition">
+              <span>Chat</span>
+            </button>
+            <button data-act="rename" class="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition" title="Ubah Nama Teman">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+            </button>
+            <button data-act="delete" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition" title="Hapus dari Daftar">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        `;
+
+        row.querySelector('[data-act="chat"]').addEventListener('click', () => {
+          contactsModal.classList.add('hidden');
+          connectToFriend(contact.id);
+        });
+
+        row.querySelector('[data-act="rename"]').addEventListener('click', () => {
+          const newName = prompt('Masukkan nama baru untuk ' + displayId(contact.id) + ':', contact.name);
+          if (newName && newName.trim()) {
+            saveOrUpdateContact(contact.id, newName.trim(), true);
+            if (conn && conn.peer === contact.id) {
+              activeChatTitle.textContent = newName.trim();
+            }
+          }
+        });
+
+        row.querySelector('[data-act="delete"]').addEventListener('click', () => {
+          if (confirm(`Hapus ${contact.name} (${displayId(contact.id)}) dari daftar teman?`)) {
+            deleteContact(contact.id);
+          }
+        });
+
+        contactsListContainer.appendChild(row);
+      });
+
+      lucide.createIcons();
+    }
+
+    let connectTimeoutTimer = null;
+    function connectToFriend(targetInput) {
+      const targetId = toPeerId(targetInput);
+      if (!targetId) {
+        alert('ID teman tidak valid. Contoh: @nama_teman');
+        return;
+      }
+      if (!peer || !peer.open) {
+        alert('ID Anda belum aktif. Tunggu status "Siap Terhubung" lalu coba lagi.');
+        return;
+      }
+      if (peer && targetId === peer.id) {
+        alert('Anda tidak bisa menghubungkan ke ID Anda sendiri!');
+        return;
+      }
+      targetPeerIdInput.value = displayId(targetId);
+      loadChatHistoryForPeer(targetId);
+
+      if (conn && conn.open && conn.peer === targetId) {
+        appendSystemMessage(`Anda sudah terhubung dengan ${getContactName(targetId)}`);
+        return;
+      }
+      if (conn) {
+        conn.close();
+      }
+      statusBadge.textContent = `Menghubungi ${getContactName(targetId)}...`;
+      const connection = peer.connect(targetId, { reliable: true });
+      setupDataConnection(connection);
+
+      // Batas waktu: kalau 25 detik belum tersambung, beri tahu penyebab yang mungkin
+      clearTimeout(connectTimeoutTimer);
+      connectTimeoutTimer = setTimeout(() => {
+        if (!connection.open) {
+          statusBadge.textContent = 'Gagal Tersambung';
+          appendSystemMessage('Koneksi ke ' + getContactName(targetId) + ' belum berhasil setelah 25 detik. Penyebab umum: teman offline, ID salah, atau jaringan butuh server TURN (lintas provider/provinsi).');
+          try { connection.close(); } catch (e) {}
+        }
+      }, 25000);
+    }
+
+    // Event Listeners Modal Kontak
+    btnOpenContacts.addEventListener('click', () => {
+      renderContactsUI();
+      contactsModal.classList.remove('hidden');
+    });
+    btnCloseContacts.addEventListener('click', () => contactsModal.classList.add('hidden'));
+
+    btnSaveMyName.addEventListener('click', () => {
+      const val = myNameInput.value.trim();
+      if (!val) return;
+      myProfileName = val;
+      localStorage.setItem('p2p_my_profile_name', myProfileName);
+      myNameDisplay.textContent = myProfileName;
+      if (conn && conn.open) {
+        conn.send({ type: 'profile-sync', name: myProfileName });
+      }
+      btnSaveMyName.textContent = 'Tersimpan ✓';
+      setTimeout(() => { btnSaveMyName.textContent = 'Simpan Nama'; }, 1200);
+    });
+
+    btnResetMyId.addEventListener('click', () => openIdModal(false));
+
+    btnAddContact.addEventListener('click', () => {
+      const name = addContactName.value.trim();
+      const id = toPeerId(addContactId.value);
+      if (!id) {
+        alert('Masukkan ID Teman terlebih dahulu! Contoh: @nama_teman');
+        return;
+      }
+      saveOrUpdateContact(id, name || ('Teman-' + displayId(id).replace(/^@|^room-/, '')), true);
+      addContactName.value = '';
+      addContactId.value = '';
+    });
+
+    // ==========================================
+    // 1. EMOJI & CUSTOM EMOTE STUDIO LOGIC
+    // ==========================================
+    const DEFAULT_EMOJIS = [
+      '😀','😂','🤣','😊','😍','🥰','😎','🤩','🥳','😏','🤔','🫡','😴','🤯',
+      '👍','👎','👏','🙌','🤝','🙏','💪','🔥','✨','❤️','💯','🎉','🚀','💎',
+      '📈','📉','💰','⚡','☕','🍗','🥚','🛠️','🏍️','✅','❌','⚠️','🎯','🏆'
+    ];
+
+    let customEmotes = JSON.parse(localStorage.getItem('p2p_custom_emotes') || '[]');
+    let baseEmoteImage = null;
+    let drawingPaths = [];
+    let isDrawing = false;
+
+    function initEmojiPanel() {
+      panelEmoji.innerHTML = '';
+      DEFAULT_EMOJIS.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.className = 'hover:bg-slate-800 p-1.5 rounded-lg transition transform active:scale-90';
+        btn.textContent = emoji;
+        btn.addEventListener('click', () => {
+          messageInput.value += emoji;
+          messageInput.focus();
+        });
+        panelEmoji.appendChild(btn);
+      });
+      renderCustomEmotes();
+    }
+
+    function renderCustomEmotes() {
+      customEmoteGrid.innerHTML = '';
+      if (customEmotes.length === 0) {
+        customEmoteEmpty.classList.remove('hidden');
+        return;
+      }
+      customEmoteEmpty.classList.add('hidden');
+
+      customEmotes.forEach((dataUrl, idx) => {
+        const item = document.createElement('div');
+        item.className = 'relative group bg-slate-950 border border-slate-800 rounded-xl p-1.5 flex items-center justify-center hover:border-emerald-500/60 transition cursor-pointer';
+        item.innerHTML = `
+          <img src="${dataUrl}" class="w-14 h-14 object-contain rounded-lg" alt="Emot">
+          <button data-del="${idx}" class="hidden group-hover:flex absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-600 text-white items-center justify-center text-[10px] shadow" title="Hapus Emot">✕</button>
+        `;
+        item.querySelector('img').addEventListener('click', () => {
+          sendCustomEmote(dataUrl);
+          emotePopover.classList.add('hidden');
+        });
+        item.querySelector('button').addEventListener('click', (e) => {
+          e.stopPropagation();
+          customEmotes.splice(idx, 1);
+          localStorage.setItem('p2p_custom_emotes', JSON.stringify(customEmotes));
+          renderCustomEmotes();
+        });
+        customEmoteGrid.appendChild(item);
+      });
+    }
+
+    btnToggleEmote.addEventListener('click', (e) => {
+      e.stopPropagation();
+      emotePopover.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!emotePopover.contains(e.target) && !btnToggleEmote.contains(e.target)) {
+        emotePopover.classList.add('hidden');
+      }
+    });
+
+    tabBtnEmoji.addEventListener('click', () => {
+      tabBtnEmoji.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white transition';
+      tabBtnCustom.className = 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition';
+      panelEmoji.classList.remove('hidden');
+      panelCustom.classList.add('hidden');
+    });
+
+    tabBtnCustom.addEventListener('click', () => {
+      tabBtnCustom.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white transition';
+      tabBtnEmoji.className = 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition';
+      panelCustom.classList.remove('hidden');
+      panelEmoji.classList.add('hidden');
+    });
+
+    function openEmoteCreator() {
+      emotePopover.classList.add('hidden');
+      emoteCreatorModal.classList.remove('hidden');
+      resetCanvasState();
+    }
+
+    function closeEmoteCreator() {
+      emoteCreatorModal.classList.add('hidden');
+    }
+
+    btnOpenCreator.addEventListener('click', openEmoteCreator);
+    btnEmptyCreate.addEventListener('click', openEmoteCreator);
+    btnCloseCreator.addEventListener('click', closeEmoteCreator);
+    btnCancelEmote.addEventListener('click', closeEmoteCreator);
+
+    function resetCanvasState() {
+      baseEmoteImage = null;
+      drawingPaths = [];
+      emoteTextInput.value = '';
+      redrawEmoteCanvas();
+    }
+
+    btnClearCanvas.addEventListener('click', resetCanvasState);
+    btnUploadEmoteImg.addEventListener('click', () => emoteImgInput.click());
+
+    emoteImgInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          baseEmoteImage = img;
+          redrawEmoteCanvas();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+      emoteImgInput.value = '';
+    });
+
+    function getCanvasCoords(e) {
+      const rect = emoteCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (emoteCanvas.width / rect.width),
+        y: (clientY - rect.top) * (emoteCanvas.height / rect.height)
+      };
+    }
+
+    function startDraw(e) {
+      e.preventDefault();
+      isDrawing = true;
+      const pos = getCanvasCoords(e);
+      drawingPaths.push({
+        color: emoteColorPicker.value,
+        size: parseInt(emoteBrushSize.value, 10),
+        points: [pos]
+      });
+      redrawEmoteCanvas();
+    }
+
+    function moveDraw(e) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const pos = getCanvasCoords(e);
+      drawingPaths[drawingPaths.length - 1].points.push(pos);
+      redrawEmoteCanvas();
+    }
+
+    function endDraw() {
+      isDrawing = false;
+    }
+
+    emoteCanvas.addEventListener('mousedown', startDraw);
+    emoteCanvas.addEventListener('mousemove', moveDraw);
+    window.addEventListener('mouseup', endDraw);
+    emoteCanvas.addEventListener('touchstart', startDraw, { passive: false });
+    emoteCanvas.addEventListener('touchmove', moveDraw, { passive: false });
+    window.addEventListener('touchend', endDraw);
+
+    emoteTextInput.addEventListener('input', redrawEmoteCanvas);
+    emoteShapeSelect.addEventListener('change', redrawEmoteCanvas);
+    emoteColorPicker.addEventListener('input', redrawEmoteCanvas);
+
+    function redrawEmoteCanvas() {
+      const w = emoteCanvas.width;
+      const h = emoteCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.save();
+      const shape = emoteShapeSelect.value;
+      ctx.beginPath();
+      if (shape === 'circle') {
+        ctx.arc(w / 2, h / 2, w / 2 - 4, 0, Math.PI * 2);
+      } else {
+        ctx.roundRect(4, 4, w - 8, h - 8, 24);
+      }
+      ctx.clip();
+
+      if (baseEmoteImage) {
+        const scale = Math.max(w / baseEmoteImage.width, h / baseEmoteImage.height);
+        const iw = baseEmoteImage.width * scale;
+        const ih = baseEmoteImage.height * scale;
+        ctx.drawImage(baseEmoteImage, (w - iw) / 2, (h - ih) / 2, iw, ih);
+      }
+
+      drawingPaths.forEach(path => {
+        if (path.points.length === 0) return;
+        ctx.beginPath();
+        ctx.strokeStyle = path.color;
+        ctx.lineWidth = path.size;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        for (let i = 1; i < path.points.length; i++) {
+          ctx.lineTo(path.points[i].x, path.points[i].y);
+        }
+        ctx.stroke();
+      });
+
+      const text = emoteTextInput.value.trim();
+      if (text) {
+        ctx.font = '900 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#000000';
+        ctx.fillStyle = emoteColorPicker.value;
+        ctx.strokeText(text.toUpperCase(), w / 2, h - 14, w - 16);
+        ctx.fillText(text.toUpperCase(), w / 2, h - 14, w - 16);
+      }
+
+      ctx.restore();
+    }
+
+    btnSaveEmote.addEventListener('click', () => {
+      if (!baseEmoteImage && drawingPaths.length === 0 && !emoteTextInput.value.trim()) {
+        alert('Kanvas masih kosong! Silakan pilih foto, gambar coretan, atau isi teks terlebih dahulu.');
+        return;
+      }
+      const dataUrl = emoteCanvas.toDataURL('image/webp', 0.85);
+      customEmotes.unshift(dataUrl);
+      localStorage.setItem('p2p_custom_emotes', JSON.stringify(customEmotes));
+      renderCustomEmotes();
+      closeEmoteCreator();
+
+      emotePopover.classList.remove('hidden');
+      tabBtnCustom.click();
+    });
+
+    function sendCustomEmote(dataUrl) {
+      if (!conn || !conn.open) return;
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      conn.send({
+        type: 'custom-emote',
+        dataUrl: dataUrl,
+        timestamp: time
+      });
+      appendEmoteBubble(dataUrl, 'me', time, true);
+    }
+
+    // ==========================================
+    // KONFIGURASI ICE: STUN + TURN (WAJIB untuk koneksi lintas jaringan/provinsi)
+    // STUN hanya cukup jika kedua HP/laptop berada di jaringan yang sama atau NAT-nya longgar.
+    // Provider seluler (CGNAT) dan WiFi berbeda butuh TURN sebagai relay.
+    // GANTI kredensial di bawah dengan milik Anda sendiri (gratis: metered.ca / Cloudflare Calls / coturn sendiri).
+    // ==========================================
+    const ICE_SERVERS = [
+      { urls: 'stun:stun.relay.metered.ca:80' },
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      // TURN Metered (relay untuk koneksi lintas jaringan/provinsi)
+      { urls: 'turn:global.relay.metered.ca:80', username: 'b6a90c5e1bcf00c76d441b08', credential: 'RREiu732stcjq5Ny' },
+      { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: 'b6a90c5e1bcf00c76d441b08', credential: 'RREiu732stcjq5Ny' },
+      { urls: 'turn:global.relay.metered.ca:443', username: 'b6a90c5e1bcf00c76d441b08', credential: 'RREiu732stcjq5Ny' },
+      { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'b6a90c5e1bcf00c76d441b08', credential: 'RREiu732stcjq5Ny' }
+    ];
+
+    // ==========================================
+    // 2. PEERJS & STABLE WEBRTC CONFIGURATION
+    // ==========================================
+    function initPeer() {
+      const myPermanentId = getOrCreatePersistentPeerId();
+      if (!myPermanentId) {
+        openIdModal(true);
+        return;
+      }
+      statusBadge.textContent = 'Menghubungkan ke Server...';
+      myPeerIdEl.textContent = displayId(myPermanentId);
+      peer = new Peer(myPermanentId, {
+        debug: 1,
+        config: {
+          iceCandidatePoolSize: 10,
+          sdpSemantics: 'unified-plan',
+          iceServers: ICE_SERVERS
+        }
+      });
+
+      peer.on('open', (id) => {
+        idRetryCount = 0;
+        myPeerIdEl.textContent = displayId(id);
+        renderContactsUI();
         statusBadge.textContent = 'Siap Terhubung';
-        statusBadge.className = 'px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        statusBadge.className = 'px-2.5 py-1 text-[11px] font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30';
       });
 
       peer.on('connection', (connection) => {
@@ -394,31 +1174,75 @@
 
       peer.on('call', (mediaCall) => {
         incomingMediaCall = mediaCall;
+        const callerName = getContactName(mediaCall.peer);
+        incomingCallerTitle.textContent = `Panggilan Video dari ${callerName}`;
         showIncomingModal();
+      });
+
+      peer.on('disconnected', () => {
+        statusBadge.textContent = 'Menyambung Ulang Server...';
+        peer.reconnect();
       });
 
       peer.on('error', (err) => {
         console.error('Peer error:', err);
         if (err.type === 'unavailable-id') {
-          alert(`ID ${displayId} sedang aktif di tab lain atau sudah dipakai orang lain! Silakan pilih nama lain.`);
-          modalSetupId.classList.remove('hidden');
+          // ID masih "tertahan" di server (mis. setelah refresh) atau dipakai orang/tab lain.
+          if (idRetryCount < 3) {
+            idRetryCount++;
+            statusBadge.textContent = 'Memulihkan ID...';
+            try { peer.destroy(); } catch (e) {}
+            setTimeout(() => initPeer(), 3000);
+          } else {
+            idRetryCount = 0;
+            try { peer.destroy(); } catch (e) {}
+            openIdModal(true, 'ID ' + displayId(myPermanentId) + ' sedang dipakai (tab lain atau orang lain). Tutup tab lain, atau pilih ID yang berbeda.');
+          }
         } else if (err.type === 'peer-unavailable') {
-          alert('ID teman tersebut sedang tidak aktif / belum membuka aplikasi ArDom.');
-        } else {
-          alert('Info Koneksi: ' + err.message);
+          statusBadge.textContent = 'Teman Sedang Offline';
+          statusBadge.className = 'px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20';
+          appendSystemMessage('Teman yang Anda hubungi sedang tidak aktif / offline saat ini.');
+        } else if (err.type === 'network' || err.type === 'disconnected' || err.type === 'socket-error' || err.type === 'socket-closed' || err.type === 'server-error') {
+          statusBadge.textContent = 'Server Sinyal Bermasalah...';
+          setTimeout(() => { if (peer && !peer.destroyed) peer.reconnect(); }, 2000);
+        } else if (err.type === 'webrtc') {
+          appendSystemMessage('Gagal membuat jalur langsung antar jaringan. Pastikan server TURN sudah diisi.');
         }
       });
     }
 
-    // Setup Data Connection
     function setupDataConnection(connection) {
       conn = connection;
+      lastTargetPeerId = conn.peer;
+
+      // Pantau status jalur WebRTC supaya kegagalan tidak diam-diam
+      const watchIce = () => {
+        const pc = connection.peerConnection;
+        if (!pc) { setTimeout(watchIce, 300); return; }
+        pc.addEventListener('iceconnectionstatechange', () => {
+          console.log('ICE state:', pc.iceConnectionState);
+          if (pc.iceConnectionState === 'failed') {
+            appendSystemMessage('Jalur jaringan gagal (ICE failed). Biasanya karena NAT ketat; butuh server TURN.');
+            if (typeof pc.restartIce === 'function') pc.restartIce();
+          }
+        });
+      };
+      watchIce();
 
       conn.on('open', () => {
-        const friendDisplayId = internalToDisplayId(conn.peer);
-        localStorage.setItem('ardom_last_target', friendDisplayId);
-        updateConnectedUI(true, friendDisplayId);
-        appendSystemMessage('Terhubung langsung (P2P) dengan ' + friendDisplayId);
+        clearTimeout(connectTimeoutTimer);
+        // Otomatis simpan ke Daftar Teman!
+        saveOrUpdateContact(conn.peer);
+        loadChatHistoryForPeer(conn.peer);
+        updateConnectedUI(true, conn.peer);
+
+        // Kirim nama profil kita ke teman agar daftar kontak mereka otomatis punya nama kita
+        conn.send({
+          type: 'profile-sync',
+          name: myProfileName
+        });
+
+        startHeartbeat();
       });
 
       conn.on('data', (data) => {
@@ -426,47 +1250,40 @@
       });
 
       conn.on('close', () => {
+        stopHeartbeat();
         updateConnectedUI(false);
-        appendSystemMessage('Koneksi terputus dengan teman.');
-      });
-
-      conn.on('error', (err) => {
-        console.error('Connection error:', err);
+        appendSystemMessage(`Koneksi dengan ${getContactName(lastTargetPeerId)} terputus.`);
       });
     }
 
+    function startHeartbeat() {
+      stopHeartbeat();
+      pingBadge.classList.remove('hidden');
+      heartbeatInterval = setInterval(() => {
+        if (conn && conn.open) {
+          conn.send({ type: 'ping', sentAt: Date.now() });
+        }
+      }, 4000);
+    }
+
+    function stopHeartbeat() {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      pingBadge.classList.add('hidden');
+    }
+
     btnConnect.addEventListener('click', () => {
-      const rawTarget = targetPeerIdInput.value.trim();
-      if (!rawTarget) {
-        alert('Harap masukkan ID Teman terlebih dahulu (contoh: @budi_ardom)!');
+      const targetId = targetPeerIdInput.value.trim();
+      if (!targetId) {
+        alert('Harap masukkan ID Teman atau pilih dari tombol Teman!');
         return;
       }
-
-      const targetInternal = parseInputToInternalId(rawTarget);
-      if (!targetInternal) {
-        alert('Format ID tidak valid!');
-        return;
-      }
-
-      if (peer && targetInternal === peer.id) {
-        alert('Anda tidak bisa menghubungkan ke ID Anda sendiri!');
-        return;
-      }
-
-      // Format ulang tampilan input agar rapi menjadi @..._ardom
-      const cleanDisplay = internalToDisplayId(targetInternal);
-      targetPeerIdInput.value = cleanDisplay;
-      localStorage.setItem('ardom_last_target', cleanDisplay);
-
-      const connection = peer.connect(targetInternal, { reliable: true });
-      setupDataConnection(connection);
+      connectToFriend(targetId);
     });
 
     btnCopyId.addEventListener('click', () => {
-      const displayId = myPeerIdEl.textContent;
-      if (!displayId || displayId === '...') return;
-      navigator.clipboard.writeText(displayId).then(() => {
-        btnCopyId.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-amber-400"></i>';
+      if (!peer || !peer.id) return;
+      navigator.clipboard.writeText(displayId(peer.id)).then(() => {
+        btnCopyId.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i>';
         lucide.createIcons();
         setTimeout(() => {
           btnCopyId.innerHTML = '<i data-lucide="copy" class="w-3.5 h-3.5"></i>';
@@ -475,25 +1292,32 @@
       });
     });
 
-    function updateConnectedUI(isConnected, friendDisplayId = '') {
+    function updateConnectedUI(isConnected, peerId = '') {
       if (isConnected) {
-        statusBadge.textContent = 'Terhubung Langsung';
+        const friendName = getContactName(peerId);
+        activeChatTitle.textContent = friendName;
+        statusBadge.textContent = 'Terhubung Stabil';
         statusBadge.className = 'px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
         messageInput.disabled = false;
         btnSendMessage.disabled = false;
         btnAttachFile.disabled = false;
+        btnToggleEmote.disabled = false;
         btnStartCall.disabled = false;
-        if (friendDisplayId) targetPeerIdInput.value = friendDisplayId;
+        targetPeerIdInput.value = displayId(peerId);
       } else {
+        activeChatTitle.textContent = '';
         statusBadge.textContent = 'Terputus';
         statusBadge.className = 'px-2 py-0.5 text-[10px] font-medium rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20';
         messageInput.disabled = true;
         btnSendMessage.disabled = true;
         btnAttachFile.disabled = true;
+        btnToggleEmote.disabled = true;
         btnStartCall.disabled = true;
       }
+      renderContactsUI();
     }
 
+    // Send Text Message
     function sendMessage() {
       const text = messageInput.value.trim();
       if (!text || !conn || !conn.open) return;
@@ -505,7 +1329,7 @@
       };
 
       conn.send(payload);
-      appendChatMessage(text, 'me', payload.timestamp);
+      appendChatMessage(text, 'me', payload.timestamp, true);
       messageInput.value = '';
     }
 
@@ -514,8 +1338,8 @@
       if (e.key === 'Enter') sendMessage();
     });
 
+    // File Sharing Logic
     btnAttachFile.addEventListener('click', () => fileInput.click());
-
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file || !conn || !conn.open) return;
@@ -547,8 +1371,7 @@
       function readNextChunk() {
         const start = chunkIndex * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
-        const slice = file.slice(start, end);
-        reader.readAsArrayBuffer(slice);
+        reader.readAsArrayBuffer(file.slice(start, end));
       }
 
       reader.onload = (e) => {
@@ -565,13 +1388,10 @@
         transferPercent.textContent = `${percent}%`;
 
         if (chunkIndex < totalChunks) {
-          setTimeout(readNextChunk, 5);
+          setTimeout(readNextChunk, 4);
         } else {
           conn.send({ type: 'file-end', id: fileId });
-          setTimeout(() => {
-            transferTray.classList.add('hidden');
-          }, 1200);
-
+          setTimeout(() => transferTray.classList.add('hidden'), 1200);
           appendFileBubble({
             name: file.name,
             size: file.size,
@@ -584,9 +1404,30 @@
       readNextChunk();
     }
 
+    // Handle Incoming Data
     function handleIncomingData(data) {
+      if (data.type === 'ping') {
+        if (conn && conn.open) conn.send({ type: 'pong', sentAt: data.sentAt });
+        return;
+      }
+      if (data.type === 'pong') {
+        const rtt = Math.max(1, Date.now() - data.sentAt);
+        pingBadge.textContent = `${rtt} ms`;
+        return;
+      }
+      if (data.type === 'profile-sync') {
+        if (data.name && conn && conn.peer) {
+          saveOrUpdateContact(conn.peer, data.name, false);
+          activeChatTitle.textContent = getContactName(conn.peer);
+        }
+        return;
+      }
       if (data.type === 'text') {
-        appendChatMessage(data.content, 'peer', data.timestamp);
+        saveOrUpdateContact(conn.peer);
+        appendChatMessage(data.content, 'peer', data.timestamp, true);
+      } else if (data.type === 'custom-emote') {
+        saveOrUpdateContact(conn.peer);
+        appendEmoteBubble(data.dataUrl, 'peer', data.timestamp, true);
       } else if (data.type === 'file-start') {
         receivingFiles[data.metadata.id] = {
           metadata: data.metadata,
@@ -619,28 +1460,54 @@
           }, 'peer');
 
           delete receivingFiles[data.id];
-          setTimeout(() => {
-            transferTray.classList.add('hidden');
-          }, 1200);
+          setTimeout(() => transferTray.classList.add('hidden'), 1200);
         }
       }
     }
 
-    function appendChatMessage(text, sender, time = '') {
+    // Render Chat & Emote Bubbles
+    function appendChatMessage(text, sender, time = '', saveToHistory = false) {
       const isMe = sender === 'me';
+      const displayTime = time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const bubble = document.createElement('div');
       bubble.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`;
 
       bubble.innerHTML = `
         <div class="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-          isMe ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 font-medium rounded-tr-none shadow-amber-500/10' : 'glass-panel text-slate-100 rounded-tl-none border border-slate-700/80 shadow-black/40'
-        } break-words shadow-lg">
+          isMe ? 'bg-emerald-600 text-slate-950 rounded-tr-none' : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
+        } break-words shadow-md">
           <p>${escapeHtml(text)}</p>
-          <span class="block text-[10px] mt-1 ${isMe ? 'text-amber-950 font-semibold' : 'text-slate-400'} text-right">${time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+          <span class="block text-[10px] mt-1 ${isMe ? 'text-emerald-200' : 'text-slate-400'} text-right">${displayTime}</span>
         </div>
       `;
       chatMessages.appendChild(bubble);
       chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      if (saveToHistory && conn && conn.peer) {
+        saveChatHistoryItem(conn.peer, { sender, type: 'text', content: text, time: displayTime });
+      }
+    }
+
+    function appendEmoteBubble(dataUrl, sender, time = '', saveToHistory = false) {
+      const isMe = sender === 'me';
+      const displayTime = time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const bubble = document.createElement('div');
+      bubble.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1 animate-pop`;
+
+      bubble.innerHTML = `
+        <div class="p-2 rounded-2xl ${
+          isMe ? 'bg-emerald-600/20 border border-emerald-500/30' : 'bg-slate-900 border border-slate-800'
+        } shadow-lg">
+          <img src="${dataUrl}" class="w-28 h-28 object-contain rounded-xl" alt="Custom Emote">
+          <span class="block text-[10px] mt-1 text-slate-400 text-right">${displayTime}</span>
+        </div>
+      `;
+      chatMessages.appendChild(bubble);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      if (saveToHistory && conn && conn.peer) {
+        saveChatHistoryItem(conn.peer, { sender, type: 'emote', content: dataUrl, time: displayTime });
+      }
     }
 
     function appendFileBubble(fileInfo, sender) {
@@ -653,17 +1520,17 @@
 
       bubble.innerHTML = `
         <div class="max-w-[80%] rounded-2xl p-3 text-sm ${
-          isMe ? 'bg-amber-700/80 text-white rounded-tr-none' : 'glass-panel text-slate-100 rounded-tl-none border border-slate-700/80'
-        } shadow-lg">
+          isMe ? 'bg-emerald-700/80 text-white rounded-tr-none' : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
+        } shadow-md">
           ${isImage ? `<img src="${fileInfo.url}" class="rounded-lg max-h-48 mb-2 object-cover w-full border border-black/20" alt="${fileInfo.name}">` : ''}
           <div class="flex items-center gap-2 mb-2">
-            <i data-lucide="file" class="w-4 h-4 text-amber-400 shrink-0"></i>
+            <i data-lucide="file" class="w-4 h-4 text-emerald-300 shrink-0"></i>
             <div class="overflow-hidden">
               <p class="font-medium truncate text-xs">${escapeHtml(fileInfo.name)}</p>
               <p class="text-[10px] text-slate-300">${formattedSize}</p>
             </div>
           </div>
-          <a href="${fileInfo.url}" download="${fileInfo.name}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-white text-xs font-semibold transition border border-white/10">
+          <a href="${fileInfo.url}" download="${fileInfo.name}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/30 hover:bg-black/50 text-white text-xs font-semibold transition border border-white/10">
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
             <span>Unduh File</span>
           </a>
@@ -678,42 +1545,126 @@
       const el = document.createElement('div');
       el.className = 'flex justify-center my-1';
       el.innerHTML = `
-        <span class="glass-panel text-[11px] text-amber-300/80 px-3 py-1 rounded-full font-mono border border-amber-500/20">
-          ${text}
+        <span class="bg-slate-900 border border-slate-800 text-[11px] text-slate-400 px-3 py-1 rounded-full font-mono text-center">
+          ${escapeHtml(text)}
         </span>
       `;
       chatMessages.appendChild(el);
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    // ==========================================
+    // 3. HIGH QUALITY & STABLE VIDEO CALLING
+    // ==========================================
+    function getMediaConstraints(facingMode = 'user', mode = 'hd') {
+      const presets = {
+        hd: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
+        balanced: { width: { ideal: 854 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } },
+        low: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 20, max: 24 } }
+      };
+      const vPreset = presets[mode] || presets.hd;
+
+      return {
+        video: {
+          facingMode: facingMode,
+          ...vPreset
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1
+        }
+      };
+    }
+
+    async function startMedia(facingMode = 'user', qualityMode = videoQualitySelect.value) {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia(getMediaConstraints(facingMode, qualityMode));
+      } catch (err) {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      }
+
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack && 'contentHint' in videoTrack) {
+        videoTrack.contentHint = 'motion';
+      }
+
+      localVideo.srcObject = localStream;
+    }
+
+    async function tuneWebRTCSenders(peerConnection, mode = 'hd') {
+      if (!peerConnection) return;
+      const bitrateMap = {
+        hd: 2200000,
+        balanced: 1000000,
+        low: 450000
+      };
+      const maxBitrate = bitrateMap[mode] || 2200000;
+
+      const senders = peerConnection.getSenders();
+      for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'video') {
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = maxBitrate;
+            params.encodings[0].networkPriority = 'high';
+            params.degradationPreference = 'balanced';
+            await sender.setParameters(params);
+          } catch (e) {
+            console.warn('Bitrate tuning warning:', e);
+          }
+        }
+      }
+    }
+
+    function attachConnectionStabilizer(call) {
+      const pc = call.peerConnection;
+      if (!pc) return;
+
+      pc.oniceconnectionstatechange = () => {
+        const state = pc.iceConnectionState;
+        if (state === 'connected' || state === 'completed') {
+          videoReconnectingBanner.classList.add('hidden');
+          callHealthDot.className = 'w-3 h-3 rounded-full bg-emerald-500 animate-pulse';
+          callNetworkStatus.textContent = 'Sinyal Stabil (' + videoQualitySelect.options[videoQualitySelect.selectedIndex].text.split(' ')[1] + ')';
+          callNetworkStatus.className = 'text-[11px] text-emerald-400 font-mono';
+        } else if (state === 'disconnected' || state === 'failed') {
+          videoReconnectingBanner.classList.remove('hidden');
+          callHealthDot.className = 'w-3 h-3 rounded-full bg-amber-400 animate-ping';
+          callNetworkStatus.textContent = 'Sinyal Goyang - Menstabilkan...';
+          callNetworkStatus.className = 'text-[11px] text-amber-400 font-mono';
+          if (typeof pc.restartIce === 'function') {
+            pc.restartIce();
+          }
+        }
+      };
+    }
+
     btnStartCall.addEventListener('click', async () => {
       if (!conn || !conn.peer) return;
       try {
-        await startMedia(currentFacingMode);
+        await startMedia(currentFacingMode, videoQualitySelect.value);
         const call = peer.call(conn.peer, localStream);
         setupMediaCall(call);
-        showVideoOverlay();
+        showVideoOverlay(getContactName(conn.peer));
       } catch (err) {
         alert('Gagal mengakses kamera/mikrofon: ' + err.message);
       }
     });
-
-    async function startMedia(facingMode = 'user') {
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-      localStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingMode },
-        audio: true
-      });
-      localVideo.srcObject = localStream;
-    }
 
     function setupMediaCall(call) {
       currentCall = call;
 
       call.on('stream', (remoteStream) => {
         remoteVideo.srcObject = remoteStream;
+        tuneWebRTCSenders(call.peerConnection, videoQualitySelect.value);
       });
 
       call.on('close', () => {
@@ -722,11 +1673,37 @@
 
       call.on('error', (err) => {
         console.error('Call error:', err);
-        endCall();
       });
 
+      attachConnectionStabilizer(call);
       startCallTimer();
     }
+
+    videoQualitySelect.addEventListener('change', async () => {
+      const mode = videoQualitySelect.value;
+      if (!currentCall || !localStream) return;
+      try {
+        await startMedia(currentFacingMode, mode);
+        const newVideoTrack = localStream.getVideoTracks()[0];
+        const sender = currentCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender && newVideoTrack) {
+          await sender.replaceTrack(newVideoTrack);
+          await tuneWebRTCSenders(currentCall.peerConnection, mode);
+        }
+      } catch (e) {
+        console.error('Quality switch error:', e);
+      }
+    });
+
+    btnRefreshIce.addEventListener('click', async () => {
+      if (!currentCall || !currentCall.peerConnection) return;
+      videoReconnectingBanner.classList.remove('hidden');
+      if (typeof currentCall.peerConnection.restartIce === 'function') {
+        currentCall.peerConnection.restartIce();
+      }
+      await tuneWebRTCSenders(currentCall.peerConnection, videoQualitySelect.value);
+      setTimeout(() => videoReconnectingBanner.classList.add('hidden'), 1500);
+    });
 
     function showIncomingModal() {
       incomingModal.classList.remove('hidden');
@@ -741,10 +1718,10 @@
     btnAcceptCall.addEventListener('click', async () => {
       hideIncomingModal();
       try {
-        await startMedia(currentFacingMode);
+        await startMedia(currentFacingMode, videoQualitySelect.value);
         incomingMediaCall.answer(localStream);
         setupMediaCall(incomingMediaCall);
-        showVideoOverlay();
+        showVideoOverlay(getContactName(incomingMediaCall.peer));
       } catch (err) {
         alert('Gagal mengakses kamera/mikrofon: ' + err.message);
       }
@@ -755,7 +1732,8 @@
       if (incomingMediaCall) incomingMediaCall.close();
     });
 
-    function showVideoOverlay() {
+    function showVideoOverlay(partnerName = 'Teman') {
+      callPartnerName.textContent = `Video Call HD • ${partnerName}`;
       videoOverlay.classList.remove('hidden');
     }
 
@@ -766,6 +1744,7 @@
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
       }
+      videoReconnectingBanner.classList.add('hidden');
       videoOverlay.classList.add('hidden');
       stopCallTimer();
     }
@@ -794,12 +1773,13 @@
 
     btnSwitchCam.addEventListener('click', async () => {
       currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+      localVideo.classList.toggle('mirror', currentFacingMode === 'user');
       try {
-        await startMedia(currentFacingMode);
+        await startMedia(currentFacingMode, videoQualitySelect.value);
         if (currentCall) {
           const videoTrack = localStream.getVideoTracks()[0];
-          const sender = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video');
-          if (sender) sender.replaceTrack(videoTrack);
+          const sender = currentCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender) await sender.replaceTrack(videoTrack);
         }
       } catch (e) {
         console.error(e);
@@ -833,6 +1813,7 @@
     }
 
     function startCallTimer() {
+      stopCallTimer();
       callSeconds = 0;
       callTimerEl.textContent = '00:00';
       callTimerInterval = setInterval(() => {
@@ -862,8 +1843,10 @@
       return div.innerHTML;
     }
 
-    // Jalankan Pengecekan ID Permanen saat Aplikasi Dibuka
-    checkAndInitId();
+    // Initialize application
+    initEmojiPanel();
+    renderContactsUI();
+    initPeer();
   </script>
 </body>
 </html>
